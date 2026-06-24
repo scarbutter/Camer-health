@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  FILE
+}
+
+enum AlertType {
+  HIGH_TEMPERATURE
+  LOW_SPO2
+  ABNORMAL_HEART_RATE
+  GENERAL
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  role        Role     @default(PATIENT)
+  isValidated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patient  Patient?
+  doctor   Doctor?
+  admin    Admin?
+
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
+  @@map("users")
+}
+
+model Patient {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime?
+  phone            String?
+  photoUrl         String?
+  address          String?
+  assignedDoctorId String?
+  assignedDoctor   Doctor?  @relation("DoctorPatients", fields: [assignedDoctorId], references: [id])
+
+  vitalSigns     VitalSign[]
+  alerts         Alert[]
+  medicalHistory MedicalHistory?
+  appointments   Appointment[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id              String  @id @default(uuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName       String
+  lastName        String
+  specialization  String?
+  phone           String?
+  address         String?
+  photoUrl        String?
+  rating          Float   @default(0)
+  yearsExperience Int     @default(0)
+  description     String?
+
+  patients     Patient[]     @relation("DoctorPatients")
+  appointments Appointment[]
+
+  @@map("doctors")
+}
+
+model Admin {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+
+  @@map("admins")
+}
+
+model VitalSign {
+  id          String   @id @default(uuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  heartRate   Float?
+  temperature Float?
+  spO2        Float?
+  steps       Int?
+  source      String   @default("manual")
+  deviceId    String?
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@map("vital_signs")
+}
+
+model Alert {
+  id        String        @id @default(uuid())
+  patientId String
+  patient   Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  type      AlertType
+  message   String
+  severity  AlertSeverity @default(MEDIUM)
+  isRead    Boolean       @default(false)
+  createdAt DateTime      @default(now())
+
+  @@map("alerts")
+}
+
+model Message {
+  id         String      @id @default(uuid())
+  senderId   String
+  sender     User        @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId String
+  receiver   User        @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  content    String?
+  type       MessageType @default(TEXT)
+  mediaUrl   String?
+  isRead     Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+
+  @@map("messages")
+}
+
+model MedicalHistory {
+  id              String   @id @default(uuid())
+  patientId       String   @unique
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  allergies       String?
+  chronicDiseases String?
+  medications     String?
+  surgeries       String?
+  familyHistory   String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("medical_histories")
+}
+
+model Appointment {
+  id        String            @id @default(uuid())
+  patientId String
+  patient   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId  String
+  doctor    Doctor            @relation(fields: [doctorId], references: [id])
+  date      DateTime?
+  reason    String?
+  status    AppointmentStatus @default(PENDING)
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@map("appointments")
+}
